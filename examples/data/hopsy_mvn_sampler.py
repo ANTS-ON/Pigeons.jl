@@ -32,8 +32,9 @@ if __name__ == '__main__':
     parser.add_argument("--seed", help="Random seed of random number generator", type=int)
 
     args = parser.parse_args()
-
-    rng = hopsy.RandomNumberGenerator(seed=args.seed)
+    
+    seed = np.uint32(args.seed)
+    rng = hopsy.RandomNumberGenerator(seed=seed)
     A, b = [[1, 1, 1], [-1, 0, 0], [0, -1, 0], [0, 0, -1]], [1, 0, 0, 0]
     base_model = hopsy.Gaussian(mean=[0, 0, 0])
     state = [0, 0, 0]
