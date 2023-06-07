@@ -64,7 +64,7 @@ export pigeons, Inputs, PT,
     # for running jobs:
     ChildProcess, MPI,
     # targets:
-    toy_mvn_target, TuringLogPotential,
+    toy_mvn_target, TuringLogPotential, HopsyTarget,
     # recorders:
     index_process, swap_acceptance_pr, log_sum_ratio, target_online, round_trip, energy_ac1, traces, disk,
     online_recorder_builders,
