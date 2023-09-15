@@ -2,7 +2,7 @@ import hopsy
 import numpy as np
 import argparse as ap
 
-NUM_SAMPLES_PER_CALL = 1000
+NUM_SAMPLES_PER_CALL = 1
 
 class TemperedModel:
     def __init__(self, model: hopsy.Gaussian, beta: float):
@@ -16,9 +16,7 @@ class TemperedModel:
 def sample_problem(problem: hopsy.Problem, rng: hopsy.RandomNumberGenerator, sample_idx: int) -> float:
     chain = hopsy.MarkovChain(problem, hopsy.GaussianProposal)
     chain.proposal.stepsize = 0.2
-    accrate, states = hopsy.sample(chain, rng, n_samples=NUM_SAMPLES_PER_CALL, thinning=10)
-    np.save(f"examples/data/hopsy_mvn_samples_{sample_idx}", states.reshape(NUM_SAMPLES_PER_CALL, -1))
-
+    hopsy.sample(chain, rng, n_samples=NUM_SAMPLES_PER_CALL, thinning=10)
     return chain.state_negative_log_likelihood, chain.state
 
 
