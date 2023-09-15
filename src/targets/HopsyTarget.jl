@@ -7,5 +7,5 @@ initialization(target::HopsyTarget, rng::SplittableRandom, replica_index::Int64)
         `$(target.command) --seed $(split(rng).seed)`,
         replica_index)
 
-hopsy_file(file_path::String) =
+hopsy_file_target(file_path::String) =
     HopsyTarget(`python $file_path`)

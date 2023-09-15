@@ -72,7 +72,7 @@ export pigeons, Inputs, PT,
     # targets:
     TuringLogPotential, StanLogPotential, HopsyTarget,
     # some examples
-    toy_mvn_target, toy_stan_target, 
+    toy_mvn_target, toy_stan_target, hopsy_file_target,
     # post-processing helpers
     sample_array, variable_names,
     # recorders:
