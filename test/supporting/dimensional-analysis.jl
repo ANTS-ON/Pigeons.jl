@@ -70,7 +70,7 @@ function single_chain_pigeons_mvn(D, explorer)
         seed = rand(Int),
         show_report = false,
         explorer, 
-        recorder_builders = [traces],
+        record = [traces],
         trace_type = :log_potential
     )
     vs = get_sample(pt, 1) 
@@ -80,17 +80,8 @@ function single_chain_pigeons_mvn(D, explorer)
 end
 
 
-function auto_mala(D)
-    explorer = Pigeons.AutoMALA(1, 0.5)
-    n_steps, ess_value = single_chain_pigeons_mvn(D, explorer)
-    return D, n_steps, ess_value
-end
-
-
-function fixed_step_size_mala(D)
-    step_size = 0.5 # if set to one, crashes too soon!
-    n_passes = ceil(Int, 2 * D^(1.0/3.0))
-    explorer = Pigeons.MALA(step_size, n_passes)
+function auto_mala(D::Int)
+    explorer = Pigeons.AutoMALA(exponent_n_refresh = 0.35)
     n_steps, ess_value = single_chain_pigeons_mvn(D, explorer)
     return D, n_steps, ess_value
 end
@@ -167,17 +158,20 @@ function scaling_plot(
 
     filename_prefix = "benchmarks/scalings_nrep=$(n_replicates)_max=$max"
 
+    slopes = Dict()
+    mkpath("benchmarks")
     open("$filename_prefix.txt", "w") do io
         for (k, v) in data 
             xs = log.(v.dims)
             ys = log.(v.costs)
             slope = LinearRegression.slope(linregress(xs, ys))[1]
+            slopes[k] = slope
             println(io, "$k: $slope")
         end
     end
 
-    savefig(cost_plot, "$filename_prefix.pdf")
-    savefig(ess_plot, "$(filename_prefix)_ess.pdf")
+    # savefig(cost_plot, "$filename_prefix.pdf")
+    # savefig(ess_plot, "$(filename_prefix)_ess.pdf")
 
-    return cost_plot
+    return slopes, cost_plot, ess_plot
 end

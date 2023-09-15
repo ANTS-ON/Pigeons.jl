@@ -18,7 +18,7 @@ we also assume the presence of the following fields:
     Given a [`tempering`](@ref) and reduced [`recorders`](@ref) 
     return an updated [`tempering`](@ref).
     """
-    adapt_tempering(tempering, reduced_recorders, iterators, var_reference, state) = @abstract
+    adapt_tempering(tempering, reduced_recorders, iterators, variational, state) = @abstract
     
     """
     $SIGNATURES 
@@ -46,23 +46,16 @@ we also assume the presence of the following fields:
     the replica is at, based on the [`tempering`](@ref) and [`Shared`](@ref) objects.  
     """
     find_log_potential(replica, tempering, shared) = @abstract
-   
-    """
-    $SIGNATURES
-    Find the global communication barrier for the given [`tempering`](@ref).
-    May be a single value or a tuple (in the case of multiple references.)
-    """
-    global_barrier(tempering) = @abstract
-
-    """
-    $SIGNATURES
-    Optional.
-    Create an [`Indexer`](@ref) for the replicas in this `tempering` object.
-    E.g. the replica indexer is used to determine to which leg a chain belongs 
-    and its relative chain index for multi-leg PT methods.
-    """
-    create_replica_indexer(tempering) = nothing
 end
+
+"""
+$SIGNATURES
+
+The global communication barrier. 
+If the PT algorithm has both a fixed and variational 
+references, return the barrier to the fixed one.
+"""
+global_barrier(pt) = global_barrier(pt.shared.tempering)
 
 """
 $SIGNATURES 
@@ -70,9 +63,9 @@ $SIGNATURES
 Build the [`tempering`](@ref) needed for [`communicate!()`](@ref). 
 """
 @provides tempering function create_tempering(inputs::Inputs) 
-    if (number_of_chains_fixed(inputs) == 0) || (number_of_chains_var(inputs) == 0)
+    if (n_chains_fixed(inputs) == 0) || (n_chains_var(inputs) == 0)
         return NonReversiblePT(inputs)
     else
-        return VariationalPT(inputs)
+        return StabilizedPT(inputs)
     end
 end

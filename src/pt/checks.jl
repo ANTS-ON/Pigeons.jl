@@ -1,29 +1,37 @@
-function preflight_checks(pt)
-    # TODO: modify those checks after modifying to support single chain mode
-    # @assert (pt.inputs.n_chains ≥ 0) && (pt.inputs.n_chains_var_reference ≥ 0) && (pt.inputs.n_chains + pt.inputs.n_chains_var_reference ≥ 2)
-    # if (pt.inputs.n_chains_var_reference == 0)
-    #     @assert isa(pt.inputs.var_reference, NoVarReference)
-    # end
-    if pt.inputs.checked_round > 0 && !pt.inputs.checkpoint
+function preflight_checks(inputs::Inputs)
+    if isdisjoint([traces, disk, online], inputs.record)
+        @info """Neither traces, disk, nor online recorders included. 
+                 You may not have access to your samples (unless you are using a custom recorder, or maybe you just want log(Z)).
+                 To add recorders, use e.g. pigeons(target = ..., record = [traces; record_default()])
+              """
+    end
+    if mpi_active() && !inputs.checkpoint
+        @warn "To be able to call load() to retrieve samples in-memory, use pigeons(target = ..., checkpoint = true)"
+    end
+    if Threads.nthreads() > 1 && !inputs.multithreaded 
+        @warn "More than one threads are available, but explore!() loop is not parallelized as inputs.multithreaded == false"
+    end
+    if inputs.checked_round > 0 && !inputs.checkpoint
         throw(ArgumentError("activate checkpoint when performing checks"))
     end
-    if disk in pt.inputs.recorder_builders && !pt.inputs.checkpoint
+    if disk in inputs.record && !inputs.checkpoint
         throw(ArgumentError("activate checkpoint when using the disk recorder"))
     end
-    if pt.inputs.checked_round < 0 || pt.inputs.checked_round > pt.inputs.n_rounds 
+    if inputs.checked_round < 0 || inputs.checked_round > inputs.n_rounds 
         throw(ArgumentError("set checked_round between 0 and n_rounds inclusively"))
     end
-    if typeof(pt.inputs.target) <: StreamTarget && pt.inputs.checkpoint 
+    if typeof(inputs.target) <: StreamTarget && inputs.checkpoint 
         @warn "Checkpoints for StreamTarget do not allow resuming jobs; partial checkpoints (for Shared structs) are still useful for checking Parallelism Invariance"
     end
 end
 
+# when pt_arguments is a string, this means we are resuming an 
+# execution, hence the preflight checks have been performed already
+preflight_checks(pt_arguments::String) = nothing
+
 """
 Perform checks to detect software defects. 
 Unable via field `checked_round` in [`Inputs`](@ref)
-Currently the following checks are implemented:
-
-- [`check_against_serial()`](@ref)
 """
 function run_checks(pt)
     if pt.shared.iterators.round != pt.inputs.checked_round
@@ -32,7 +40,6 @@ function run_checks(pt)
 
     only_one_process(pt) do
         check_against_serial(pt)
-        #check_serialization(pt) # TODO: check immutables do not change, etc
     end
 end
 
@@ -62,20 +69,22 @@ function check_against_serial(pt)
     serial_checkpoint = "$(serial_pt_result.exec_folder)/round=$round/checkpoint"
 
     # compare the serialized files
-    compare_checkpoints(parallel_checkpoint, serial_checkpoint)
+    immutables = "$(pt.exec_folder)/immutables.jls"
+    deserialize_immutables!(immutables)
+    compare_checkpoints(parallel_checkpoint, serial_checkpoint, immutables)
     compare_serialized(
         "$(pt.exec_folder)/immutables.jls", 
         "$(serial_pt_result.exec_folder)/immutables.jls")
 end
 
-compare_checkpoints(checkpoint_folder1, checkpoint_folder2) = 
+compare_checkpoints(checkpoint_folder1, checkpoint_folder2, immutables) = 
     for file in readdir(checkpoint_folder1)
         if endswith(file, ".jls")
             compare_serialized("$checkpoint_folder1/$file", "$checkpoint_folder2/$file")
         end
     end
 
-function compare_serialized(file1, file2)
+function compare_serialized(file1, file2, immutables = nothing)
     first  = deserialize(file1)
     second = deserialize(file2)
     if first != second
@@ -143,6 +152,7 @@ Base.:(==)(a::NonReproducible, b::NonReproducible) = true
 
 # TODO: maybe move this to a sub-module in which == is nicer by default?
 # mutable (incl imm with mut fields) structs do not have a nice ===, overload those:
+Base.:(==)(a::StanState, b::StanState) = recursive_equal(a, b)
 Base.:(==)(a::SplittableRandom, b::SplittableRandom) = recursive_equal(a, b)
 Base.:(==)(a::Replica, b::Replica) = recursive_equal(a, b) 
 Base.:(==)(a::Augmentation, b::Augmentation) = recursive_equal(a, b) 
@@ -152,7 +162,7 @@ Base.:(==)(a::Compose, b::Compose) = recursive_equal(a, b)
 Base.:(==)(a::Iterators, b::Iterators) = recursive_equal(a, b) 
 Base.:(==)(a::Schedule, b::Schedule) = recursive_equal(a, b)
 Base.:(==)(a::DEO, b::DEO) = recursive_equal(a, b)
-Base.:(==)(a::Shared, b::Shared) = recursive_equal(a, b)
+Base.:(==)(a::Shared, b::Shared) = recursive_equal(a, b, [:reports])
 Base.:(==)(a::BlangTarget, b::BlangTarget) = recursive_equal(a, b)
 Base.:(==)(a::NonReversiblePT, b::NonReversiblePT) = recursive_equal(a, b)
 Base.:(==)(a::InterpolatingPath, b::InterpolatingPath) = recursive_equal(a, b)
@@ -164,11 +174,15 @@ Base.:(==)(a::RoundTripRecorder, b::RoundTripRecorder) = recursive_equal(a, b)
 Base.:(==)(a::OnlineStateRecorder, b::OnlineStateRecorder) = recursive_equal(a, b)
 Base.:(==)(a::LocalBarrier, b::LocalBarrier) = recursive_equal(a, b)
 
-function recursive_equal(a::T, b::T) where {T}
+Base.:(==)(a::StanLogPotential, b::StanLogPotential) = 
+    a.data == b.data && BridgeStan.name(a.model) == BridgeStan.name(b.model)
+
+function recursive_equal(a::T, b::T, exclude = []) where {T}
     for f in fieldnames(T)
-        if getfield(a, f) != getfield(b, f)
+        if !(f in exclude) && (getfield(a, f) != getfield(b, f)) 
             return false
         end
     end
     return true
 end
+

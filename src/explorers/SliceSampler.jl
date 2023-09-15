@@ -14,26 +14,35 @@ $FIELDS
 
     """ Number of passes through all variables per exploration step. """
     n_passes::Int = 3  
+
+    """ Maximum number of interations inside shrink_slice! before erroring out """
+    max_iter::Int = 4_096  
 end
 
 explorer_recorder_builders(::SliceSampler) = [explorer_acceptance_pr, explorer_n_steps]
 
 function step!(explorer::SliceSampler, replica, shared)
     log_potential = find_log_potential(replica, shared.tempering, shared)
-    # TODO: each step starts with a recomputation of the logprob
-    # indicated by -Inf (safe b/c -Inf would be an invalid state that should be caught earlier)
-    # consider at some point having an input cached_lp to step! that stores across steps
     cached_lp = -Inf
     for i in 1:explorer.n_passes
         cached_lp = slice_sample!(explorer, replica.state, log_potential, cached_lp, replica)
     end
 end
 
-function slice_sample!(h::SliceSampler, state::AbstractVector, log_potential, cached_lp, replica)
-    # if there is no cached logprob, compute it from scratch
-    if cached_lp == -Inf
-        cached_lp = log_potential(state)
+function cached_log_potential(log_potential, state, cached_lp)
+    return if cached_lp == -Inf 
+        result = log_potential(state)
+        if result == -Inf 
+            error("SliceSampler supports contrained target, but the sampler should be initialized in the support: $state")
+        end
+        return result
+    else
+        cached_lp
     end
+end
+
+function slice_sample!(h::SliceSampler, state::AbstractVector, log_potential, cached_lp, replica)
+    cached_lp = cached_log_potential(log_potential, state, cached_lp)
     # iterate over coordinates
     for c in 1:length(state) 
         pointer = Ref(state, c)
@@ -43,30 +52,23 @@ function slice_sample!(h::SliceSampler, state::AbstractVector, log_potential, ca
 end
 
 function slice_sample!(h::SliceSampler, state::DynamicPPL.TypedVarInfo, log_potential, cached_lp, replica)
-    cached_lp = on_transformed_space(state, log_potential) do
-        cl_cached_lp = (cached_lp == -Inf) ? log_potential(state) : cached_lp
-        for i in 1:length(state.metadata)
-            for c in 1:length(state.metadata[i].vals)
-                pointer = Ref(state.metadata[i].vals, c)
-                cl_cached_lp = slice_sample_coord!(h, replica, pointer, log_potential, cl_cached_lp)
-            end
+    cached_lp = cached_log_potential(log_potential, state, cached_lp)
+    for i in 1:length(state.metadata)
+        for c in 1:length(state.metadata[i].vals)
+            pointer = Ref(state.metadata[i].vals, c)
+            cached_lp = slice_sample_coord!(h, replica, pointer, log_potential, cached_lp)
         end
-        return cl_cached_lp
     end
     return cached_lp
 end
 
-function on_transformed_space(sampling_task, state::DynamicPPL.TypedVarInfo, log_potential)
-    transform_back = false
-    if !DynamicPPL.istrans(state, DynamicPPL._getvns(state, DynamicPPL.SampleFromPrior())[1]) # check if in constrained space
-        DynamicPPL.link!!(state, DynamicPPL.SampleFromPrior(), turing_model(log_potential)) # transform to unconstrained space
-        transform_back = true # transform it back after log_potential evaluation
+function slice_sample!(h::SliceSampler, state::StanState, log_potential, cached_lp, replica)
+    cached_lp = cached_log_potential(log_potential, state, cached_lp)
+    for i in eachindex(state.unconstrained_parameters)
+        pointer = Ref(state.unconstrained_parameters, i)
+        cached_lp = slice_sample_coord!(h, replica, pointer, log_potential, cached_lp)
     end
-    ret = sampling_task()
-    if transform_back
-        DynamicPPL.invlink!!(state, turing_model(log_potential)) # transform back to constrained space
-    end
-    return ret
+    return cached_lp
 end
 
 function slice_sample_coord!(h, replica, pointer, log_potential, cached_lp)
@@ -148,15 +150,16 @@ function initialize_slice_endpoints(width, pointer, rng, ::Type{T}) where T <: I
 end
 
 function slice_shrink!(h::SliceSampler, replica, z, L, R, lp_L, lp_R, pointer, log_potential)
-   
+    @assert isfinite(z)
     rng = replica.rng
     state = replica.state
     old_position = pointer[]
     Lbar = L
     Rbar = R
+    new_lp = zero(z) # init the variable new_lp so it lives outside the `while` scope
     n = 1
 
-    while true
+    while n <= h.max_iter
         new_position = draw_new_position(Lbar, Rbar, rng, typeof(pointer[]))
         pointer[] = new_position 
         new_lp = log_potential(state)
@@ -176,7 +179,12 @@ function slice_shrink!(h::SliceSampler, replica, z, L, R, lp_L, lp_R, pointer, l
     end
     # code should never get here, because eventually
     # shrinkage should produce an acceptable point
-    error()
+    error("""Maximum number of iterations $(h.max_iter) reached. Dumping info:
+            - Lbar   = $Lbar
+            - Rbar   = $Rbar
+            - new_lp = $new_lp
+            - z      = $z
+    """)
     return 0.0
 end
 

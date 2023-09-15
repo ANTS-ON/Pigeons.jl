@@ -32,7 +32,7 @@ Save the full trace for the target chain to disk.
 The `disk` recorders are safe to use in a multi-threaded and/or 
 distributed context as each replica uses its own file.
 
-To post-process files in the correct order, use [`process_samples`](@ref).
+To post-process files in the correct order, use [`process_sample`](@ref).
 """
 @provides recorder disk() = DiskRecorder() 
 
@@ -86,8 +86,18 @@ to compute stepping stone estimators of lognormalization contants.
 
 """ 
 Online statistics on the target chain. 
+The samples are processed in the original model parameterization.
 """
-@provides recorder target_online() = OnlineStateRecorder() 
+@provides recorder online() = OnlineStateRecorder() 
+
+""" 
+Online statistics on potentially transformed samples for the target chain. 
+For example, if a gradient-based method is used, the target is often 
+transformed to be defined on an unconstrained space. 
+This is used internally by [`explorer`](@ref)'s for adaptation purposes 
+(in particular, pre-conditioning and variational references).
+"""
+@provides recorder _transformed_online() = OnlineStateRecorder() 
 
 """ 
 Restart and round-trip counts. 
@@ -179,9 +189,11 @@ function Base.empty!(x::GroupBy)
 end
 
 function Base.empty!(o::CovMatrix{T}) where {T} 
-    o.b = zeros(T, p)
-    o.A = zeros(T, p, p)
-    o.value = zeros(T, p, p) 
+    o.n = zero(o.n)
+    z   = zero(T)
+    fill!(o.b, z)
+    fill!(o.A, z)
+    fill!(o.value, z) 
     return o
 end
 

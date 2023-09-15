@@ -1,4 +1,3 @@
-
 """
 Global settings needed for MPI job submission:
 $FIELDS
@@ -37,9 +36,9 @@ $FIELDS
     """
     In most case, leave empty as MPIPreferences.use_system_binary() will 
     autodetect, but if it does not, the path to libmpi.so can be specified 
-    this way, e.g. on compute Canada to work the system not setting that 
-    environment variable correctly, use 
-    `/cvmfs/soft.computecanada.ca/easybuild/software/2020/avx2/Compiler/intel2020/openmpi/4.0.3/lib/libmpi`
+    this way, e.g. this is needed on compute Canada clusters (as they are not setting that 
+    environment variable correctly) where it needs to be set to
+    "/cvmfs/soft.computecanada.ca/easybuild/software/2020/avx2/Compiler/intel2020/openmpi/4.0.3/lib/libmpi"
     (notice the .so is not included).
     """
     library_name::Union{String, Nothing} = nothing
@@ -59,7 +58,18 @@ end
 """
 $SIGNATURES
 
-Arguments are passed in the constructor of [`MPISettings`](@ref).
+Look first at the list of clusters that have "presets" available, 
+by typing `Pigeons.setup_mpi_` and then tab. These are the most 
+straightforward to use. 
+
+If presets are not available, use `setup_mpi()`. To see the 
+documentation of the arguments of `setup_mpi()`, see 
+[`MPISettings`](@ref)
+(i.e. `args...` are passed to the constructor of [`MPISettings`](@ref)). 
+
+Pull requests to `Pigeons/src/submission/presets.jl` are welcome 
+if you would like to add a new "preset" functions of the form 
+`Pigeons.setup_mpi_...()`.
 """
 setup_mpi(; args...) = setup_mpi(MPISettings(; args...))
 
@@ -76,6 +86,7 @@ modules_string(settings::MPISettings) =
 $SIGNATURES
 
 Run this function once before running MPI jobs. 
+This should be done on the head node of a compute cluster.
 The setting are permanently saved. 
 See [`MPISettings`](@ref).
 """
@@ -89,32 +100,33 @@ function setup_mpi(settings::MPISettings)
     # create module file
     write("$folder/modules.sh", modules_string(settings))
 
-    # call bash to set things up
-    julia = join(julia_cmd_no_start_up().exec, " ")
-    specified_lib = 
-        if settings.library_name === nothing 
-            "" 
-        else
-            """; library_names=[raw"$(settings.library_name)"]"""
-        end
-    sh( """
-        source $folder/modules.sh
-        $julia --project -e 'using MPIPreferences; MPIPreferences.use_system_binary($specified_lib)'
-        """)
+    # call MPIPrerences
+    if settings.library_name === nothing 
+        _use_system_binary()
+    else
+        _use_system_binary(library_names = [settings.library_name])
+    end
 
     touch("$folder/complete") # signals success
 
-    if !isempty(settings.environment_modules)
-        println("""
-        Important: add the line
-        
-            source $folder/modules.sh
-        
-        to your shell start-up script.
-        """)
-    end
-
-    println("Please restart Julia")
-
     return nothing
+end
+
+# So that users do not have MPIPreferences listed in their direct dependencies 
+# Note we are assuming Julia 1.8+, so the bug described in the "Note" of 
+# https://juliaparallel.org/MPI.jl/stable/configuration/ should not apply here.
+# Also makes the call more sane (avoid throwing an error on success!)
+function _use_system_binary(; args...) 
+    try
+        MPIPreferences.use_system_binary(; args...)
+    catch e 
+        # we need to do this because the way MPIPreferences signal you have to restart is via 
+        # error("You will need to restart Julia for the changes to take effect")
+        if e.mgs == "You will need to restart Julia for the changes to take effect"
+            # nothing to do, MPI submissions are in separate processes so there is
+            # no need to ask the restart Julia
+        else
+            showerror(stderr, e)
+        end
+    end
 end

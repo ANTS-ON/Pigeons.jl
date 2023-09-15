@@ -24,6 +24,18 @@ The worker process should be able to reply to commands of the following forms
 abstract type StreamTarget end
 
 """
+$SIGNATURES 
+
+Dispose of the child processes associated with the pt's 
+[`StreamState`](@ref)'s
+"""
+function kill_child_processes(pt)
+    for replica in locals(pt.replicas)
+        Expect.kill(replica.state.worker_process)
+    end
+end
+
+"""
 $SIGNATURES
 
 Return [`StreamState`](@ref) by following these steps:
@@ -32,7 +44,7 @@ Return [`StreamState`](@ref) by following these steps:
     as target-specific configurations provided by `target`.
 2. Create [`StreamState`](@ref) from the `Cmd` created in step 1 and return it.
 """
-initialization(target::StreamTarget, rng::SplittableRandom, replica_index::Int64) = @abstract 
+initialization(target::StreamTarget, rng::AbstractRNG, replica_index::Int64) = @abstract 
 
 """ 
 States used in the replicas when a [`StreamTarget`](@ref) is used. 
@@ -70,7 +82,6 @@ will take care of path construction
     beta
 end
 
-create_state_initializer(target::StreamTarget, ::Inputs) = target  
 default_explorer(target::StreamTarget) = target 
 
 #= 
@@ -86,7 +97,7 @@ Delegate iid sampling to the worker process.
 Same call as explorer, rely on the worker to 
 detect that the annealing parameter is zero.
 =#
-sample_iid!(log_potential::StreamPotential, replica) = 
+sample_iid!(log_potential::StreamPotential, replica, shared) = 
     call_sampler!(log_potential, replica.state)
 
 create_path(target::StreamTarget, ::Inputs) = StreamPath()
@@ -107,7 +118,7 @@ call_sampler!(log_potential::StreamPotential, state::StreamState) =
     )
 
 # convert a random UInt64 to positive Int64/Java-Long by dropping the sign bit
-java_seed(rng::SplittableRandom) = (rand(split(rng), UInt64) >>> 1) % Int64
+java_seed(rng::AbstractRNG) = (rand(split(rng), UInt64) >>> 1) % Int64
 
 #=
 Simple stdin/stdout text-based protocol. 
@@ -115,14 +126,14 @@ Simple stdin/stdout text-based protocol.
 function invoke_worker(
         state::StreamState, 
         request::AbstractString, 
-        return_type::Type = Nothing)
-
+        return_type::Type{T} = Nothing) where {T}
     println(state.worker_process, request)
     prefix = expect!(state.worker_process, "response(")
-    if state.replica_index == 1 && length(prefix) > 3
+    if state.replica_index == 1 && 
+            length(prefix) > 4 # otherwise running on windows spits a lot of empty lines
         # display output for replica 1 to show e.g. info messages
         print(prefix)
     end
     response_str = expect!(state.worker_process, ")")
-    return return_type == Nothing ? nothing : parse(return_type, response_str)
+    return T == Nothing ? nothing : parse(T, response_str)
 end

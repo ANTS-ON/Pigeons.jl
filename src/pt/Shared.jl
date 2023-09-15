@@ -13,7 +13,7 @@ Only one instance maintained per process.
     """
     See [`Iterators`](@ref).
     """
-    iterators
+    iterators::Iterators
 
     """
     See [`tempering`](@ref).
@@ -26,15 +26,14 @@ Only one instance maintained per process.
     explorer
 
     """
-    See [`var_reference`](@ref).
+    Named tuple of DataFrame's
     """
-    var_reference
-
-    """
-    See [`Indexer`](@ref).
-    """
-    indexer
+    reports
 end
+
+Base.show(io::IO, s::Shared) = 
+    print(io, "Shared($(s.iterators), $(s.tempering), $(s.explorer), ...)")
+
 
 """
 $SIGNATURES 
@@ -45,8 +44,6 @@ function Shared(inputs)
     iterators = Iterators() 
     tempering = create_tempering(inputs)
     explorer = create_explorer(inputs) 
-    var_reference = create_var_reference(inputs)
-    indexer = create_replica_indexer(tempering)
-    return Shared(iterators, tempering, explorer, var_reference, indexer)
+    return Shared(iterators, tempering, explorer, init_dfs())
 end
 

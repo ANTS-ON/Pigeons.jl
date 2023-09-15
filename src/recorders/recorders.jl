@@ -23,7 +23,7 @@ accessing statistic values.
     use [`@record_if_requested!()`](@ref) instead.
     """
     function record_if_requested!(recorders, recorder_key::Symbol, value)
-        if haskey(recorders, recorder_key)
+        if !isnothing(recorders) && haskey(recorders, recorder_key)
             record!(recorders[recorder_key], value)
         end
     end
@@ -64,8 +64,8 @@ function recorder_builders(inputs::Inputs, shared::Shared)
     result = OrderedSet{Function}()
     union!(result, explorer_recorder_builders(shared.explorer))
     union!(result, tempering_recorder_builders(shared.tempering))
-    union!(result, inputs.recorder_builders)
-    union!(result, var_reference_recorder_builders(inputs.var_reference))
+    union!(result, inputs.record)
+    union!(result, variational_recorder_builders(inputs.variational))
     return result
 end
 

@@ -32,7 +32,7 @@ The code on Blang's side of the bridge is available at
 this address: 
 https://github.com/UBC-Stat-ML/blangSDK/blob/master/src/main/java/blang/engines/internals/factories/Pigeons.java
 =#
-initialization(target::BlangTarget, rng::SplittableRandom, replica_index::Int64) = 
+initialization(target::BlangTarget, rng::AbstractRNG, replica_index::Int64) = 
     StreamState(
         `$(target.command) 
             --experimentConfigs.resultsHTMLPage false
@@ -76,6 +76,11 @@ blang_sitka() = blang_sitka(`
         --model.predictivesProportion 0.0  
         --model.samplerOptions.useMiniMoves true
     `)
+
+blang_eight_schools() = 
+    BlangTarget(
+        `$(blang_executable("blangDemos", "demos.EightSchools")) --model.data $(blang_repo_path("blangDemos"))/data/eight-schools.csv`
+    )
 
 blang_unid(model_options = "") = 
     BlangTarget(

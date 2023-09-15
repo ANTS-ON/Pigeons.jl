@@ -3,12 +3,11 @@ struct HetPrecisionNormalLogPotential
 end
 HetPrecisionNormalLogPotential(dim::Int) = HetPrecisionNormalLogPotential(ones(dim))
 
-Pigeons.create_reference_log_potential(
-    target::HetPrecisionNormalLogPotential, ::Inputs) = 
+Pigeons.default_reference(
+    target::HetPrecisionNormalLogPotential) = 
         target
 
-Pigeons.create_state_initializer(my_potential::HetPrecisionNormalLogPotential, ::Inputs) = my_potential
-Pigeons.initialization(target::HetPrecisionNormalLogPotential, ::SplittableRandom, ::Int) = zeros(length(target.precisions))
+Pigeons.initialization(target::HetPrecisionNormalLogPotential, ::AbstractRNG, ::Int) = zeros(length(target.precisions))
     
 function Pigeons.sample_iid!(my_potential::HetPrecisionNormalLogPotential, replica)
     d = length(replica.state)
@@ -16,14 +15,6 @@ function Pigeons.sample_iid!(my_potential::HetPrecisionNormalLogPotential, repli
     for i in 1:d 
         replica.state[i] = randn(replica.rng) / sqrt(my_potential.precisions[i])
     end
-end
-
-function Pigeons.gradient!!(log_potential::HetPrecisionNormalLogPotential, x::T, buffer::T) where {T}
-    len = length(x)
-    @assert len == length(log_potential.precisions) 
-    @assert len == length(buffer)
-    buffer .= -log_potential.precisions .* x
-    return buffer
 end
 
 function (log_potential::HetPrecisionNormalLogPotential)(x) 
@@ -35,3 +26,8 @@ function (log_potential::HetPrecisionNormalLogPotential)(x)
     end
     -0.5 * sum
 end
+
+LogDensityProblems.logdensity(log_potential::HetPrecisionNormalLogPotential, x) = log_potential(x) 
+LogDensityProblems.dimension(log_potential::HetPrecisionNormalLogPotential) = length(log_potential.precisions)
+LogDensityProblemsAD.ADgradient(kind::Symbol, log_potential::HetPrecisionNormalLogPotential, buffers::Pigeons.Augmentation) = 
+    LogDensityProblemsAD.ADgradient(kind, log_potential)

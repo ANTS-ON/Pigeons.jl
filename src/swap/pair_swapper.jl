@@ -133,15 +133,17 @@ record_swap_stats!(swapper::TestSwapper, recorder, chain1::Int, stat1, chain2::I
 
 # toy target based on TestSwapper
 
-create_state_initializer(target::TestSwapper, ::Inputs) = Ref(nothing)
+function initialization(target::TestSwapper, ::AbstractRNG, ::Int) 
+    return nothing 
+end
 
 default_explorer(::TestSwapper) = nothing 
     step!(::Nothing, replica, shared) = nothing
 
-sample_iid!(::TestSwapper, replica) = nothing
+sample_iid!(::TestSwapper, replica, shared) = nothing
 
 create_path(testSwapper::TestSwapper, ::Inputs) = testSwapper
     interpolate(testSwapper::TestSwapper, beta) = testSwapper
 
 create_pair_swapper(tempering, target::TestSwapper) = target
-create_pair_swapper(tempering::VariationalPT, target::TestSwapper) = target
+create_pair_swapper(tempering::StabilizedPT, target::TestSwapper) = target

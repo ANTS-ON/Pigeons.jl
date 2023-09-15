@@ -28,19 +28,47 @@ makedocs(;
     sitename="Pigeons.jl",
     strict=true,
     format=Documenter.HTML(;
-        prettyurls=get(ENV, "CI", "false") == "true",
+        prettyurls=true, # always on, avoids confusion when building locally. If needed, serve the "build" folder locally with LiveServer. #get(ENV, "CI", "false") == "true",
         canonical="https://Julia-Tempering.github.io/Pigeons.jl",
         edit_link="main",
         assets=String[],
     ),
     pages=[
-        "Guide" => "index.md", 
-        "Parallel Tempering (PT)" => "pt.md", 
-        "Distributed PT" => "distributed.md",
+        "Basic usage (local)" => "index.md",
+        "Why PT?" => "unidentifiable-example.md",
+        "Parallelization" => "parallel.md", 
+        "Distributed usage (MPI)" => "mpi.md",
+        "Variational PT" => "variational.md", 
+        "Supported inputs" => [
+            "Inputs overview" => "input-overview.md",
+            "Turing.jl model" => "input-turing.md", 
+            "Black-box function" => "input-julia.md",
+            "Stan model" => "input-stan.md", 
+            "Non-julian MCMC" => "input-nonjulian.md", 
+            "Custom MCMC" => "input-explorers.md"
+        ],
+        "Outputs" => [
+            "Outputs overview" => "output-overview.md",
+            "Quick reports" => "output-reports.md", 
+            "Plots" => "output-plotting.md", 
+            "log(Z)" => "output-normalization.md", 
+            "Numerical" => "output-numerical.md", 
+            "Online stats" => "output-online.md", 
+            "Off-memory" => "output-off-memory.md", 
+            "PT diagnostics" => "output-pt.md", 
+            "Custom types" => "output-custom-types.md",
+            "MPI output" => "output-mpi-postprocessing.md"
+        ],
+        "Checkpoints" => "checkpoints.md",
+        "Correctness checks" => "correctness.md",
+        "More on PT" => "pt.md", 
+        "More on distributed PT" => "distributed.md",
         "Interfaces" => Pigeons.informal_doc(@__DIR__, Pigeons),
         "Reference" => "reference.md",
     ],
 )
+
+rm(joinpath(script_dir, "build", "results"), recursive=true) # delete `results` folder before deploying
 
 deploydocs(;
     repo="github.com/Julia-Tempering/Pigeons.jl",

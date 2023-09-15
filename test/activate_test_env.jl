@@ -1,6 +1,6 @@
 # Use this to debug tests, e.g. calling a single test_xxx.jl file. 
 
-# Add the parent project by path to the test project. 
+# This script will add the parent project by path to the test project. 
 # If we do not do this, we will end up testing the 
 # latest released version instead of the one checked out.
 
@@ -20,10 +20,7 @@ include("supporting/setup.jl")
 
 @info   """
         next time you call `test` from the parent project 
-        to run all tests, you may get the error message 
-
-            "ERROR: can not merge projects"
-
-        to address this, simply delete the 
-        generated file "test/Manifest.toml"
+        to run all tests, you may get an error message 
+        about "can not merge projects", if so, simply delete 
+        the generated file "test/Manifest.toml"
         """

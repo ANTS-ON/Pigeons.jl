@@ -12,6 +12,7 @@ import MPI: Comm, Allreduce, Comm_rank,
 
      
 using Base: Forward
+using DataFrames
 using Distributions
 using StatsBase
 using Interpolations
@@ -37,6 +38,9 @@ using Statistics
 using RecipesBase
 using ZipFile
 using ForwardDiff
+using BridgeStan
+using LogDensityProblems 
+using LogDensityProblemsAD
 
 import Serialization.serialize
 import Serialization.deserialize
@@ -56,24 +60,30 @@ import Base.merge
 
 import DynamicPPL
 
-const use_auto_exec_folder = ""
+const use_auto_exec_folder = "use_auto_exec_folder"
 
 include("includes.jl")
 
 export pigeons, Inputs, PT, 
     # for running jobs:
     ChildProcess, MPI,
+    # references:
+    DistributionLogPotential,
     # targets:
-    toy_mvn_target, TuringLogPotential, HopsyTarget,
+    TuringLogPotential, StanLogPotential, HopsyTarget,
+    # some examples
+    toy_mvn_target, toy_stan_target, 
+    # post-processing helpers
+    sample_array, variable_names,
     # recorders:
-    index_process, swap_acceptance_pr, log_sum_ratio, target_online, round_trip, energy_ac1, traces, disk,
-    online_recorder_builders,
+    index_process, swap_acceptance_pr, log_sum_ratio, online, round_trip, energy_ac1, traces, disk,
+    record_online, record_default, 
     # utils to run on scheduler:
     Result, load, setup_mpi, queue_status, queue_ncpus_free, kill_job, watch,
     # getting information out of an execution:
-    stepping_stone_pair, n_tempered_restarts, n_round_trips, process_samples, get_sample,
+    stepping_stone, n_tempered_restarts, n_round_trips, process_sample, get_sample,
     # variational references:
-    GaussianReference, NoVarReference, 
+    GaussianReference, 
     # samplers 
     SliceSampler, AutoMALA, Compose
 end # End module

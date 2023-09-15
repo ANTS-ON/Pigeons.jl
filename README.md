@@ -8,21 +8,31 @@
 [![Coverage](https://codecov.io/gh/Julia-Tempering/Pigeons.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/Julia-Tempering/Pigeons.jl)
 [![ColPrac: Contributor's Guide on Collaborative Practices for Community Packages](https://img.shields.io/badge/ColPrac-Contributor's%20Guide-blueviolet)](https://github.com/SciML/ColPrac)
 
-Pigeons.jl enables users to leverage distributed computation to obtain samples from complex distributions, such as those arising in Bayesian inference and statistical mechanics. It can easily be used in a multi-threaded context and/or distributed over thousands of MPI-communicating machines.
+`Pigeons` is a Julia package to approximate challenging posterior distributions, and more broadly, Lebesgue integration problems. Pigeons can be used in a multi-threaded context, and/or distributed over hundreds or thousands of MPI-communicating machines.
 
-:warning: **Warning** <br>
-This package is currently under development. The user interface may change substantially prior to the first stable release.
-Please [view our documentation](https://julia-tempering.github.io/Pigeons.jl/dev/) for the most up-to-date description.
-
-
-## Timeline
-
-The following features should be implemented according to the timeline given below:
-- Sampling on discrete state spaces: January 2023 :heavy_check_mark:
-- Parallel tempering with a variational reference: April 2023 :heavy_check_mark:
-- "Parallel parallel" tempering (multiple copies of parallel tempering): TBD
+[For more information, see the documentation.](https://pigeons.run/dev/)
 
 
 ## Funding and acknowledgments 
 
 The development and testing of Pigeons.jl is supported by the Natural Sciences and Engineering Research Council of Canada Discovery Grant and Vanier programs, and by the University of British Columbia Advanced Research Computing. The authors would like to thank Roman Baranowski, Jacob Boschee and Alyza Rosario for their help with MPI.
+
+
+## How to cite Pigeons 
+
+Our team works hard to maintain and improve the Pigeons package. Please consider citing our work by referring to [our Pigeons paper](https://arxiv.org/abs/2308.09769).
+
+**BibTeX code for citing Pigeons**
+
+```
+@article{surjanovic2023pigeons,
+  title={Pigeons.jl: {D}istributed sampling from intractable distributions},
+  author={Surjanovic, Nikola and Biron-Lattes, Miguel and Tiede, Paul and Syed, Saifuddin and Campbell, Trevor and Bouchard-C{\^o}t{\'e}, Alexandre},
+  journal={arXiv:2308.09769},
+  year={2023}
+}
+```
+
+**APA**
+
+Surjanovic, N., Biron-Lattes, M., Tiede, P., Syed, S., Campbell, T., & Bouchard-Côté, A. (2023). Pigeons.jl: Distributed sampling from intractable distributions. *arXiv:2308.09769.*

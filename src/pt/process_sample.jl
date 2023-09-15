@@ -1,3 +1,45 @@
+"""
+$SIGNATURES 
+
+Copy the target chain(s) samples into an array with axes: 
+`iteration x variable x target chain`. 
+For example, with [`StabilizedPT`](@ref) there 
+are two target chains. 
+By default, there is only one chain produced. 
+
+See [`extract_sample()`](@ref) for information how the variables are 
+flattened, and use [`variable_names()`](@ref) to obtain string 
+names for the flattened variables. 
+
+The combination of this function and [`variable_names()`](@ref) is useful for 
+creating [MCMCChains](https://turinglang.org/MCMCChains.jl/stable/getting-started/) 
+which can then be used to obtain summary statistics, diagnostics, create trace plots, 
+and pair plots (via [PairPlots](https://sefffal.github.io/PairPlots.jl/dev/chains/)).
+"""
+function sample_array(pt::PT)
+    targets = target_chains(pt)
+    dim, size = sample_dim_size(pt, targets)
+    result = zeros(size, dim, length(targets)) 
+    for t_index in eachindex(targets) 
+        t = targets[t_index] 
+        sample = get_sample(pt, t) 
+        for i in 1:size 
+            vector = sample[i] 
+            result[i, :, t_index] .= vector
+        end
+    end
+    return result
+end
+
+function sample_dim_size(pt::PT, targets = target_chains(pt))
+    sample = get_sample(pt, targets[1]) 
+    return length(sample[1]), length(sample)
+end
+
+function target_chains(pt::PT) 
+    n = n_chains(pt.inputs)
+    return filter(i -> is_target(pt.shared.tempering.swap_graphs, i), 1:n)
+end
 
 """
     $(TYPEDEF)
@@ -14,12 +56,21 @@ struct SampleArray{T,PT} <: AbstractVector{T}
     function SampleArray(pt::P, chain::Int) where {P<:PT}
         rr = pt.reduced_recorders
         T = typeof(get_sample(pt, chain, 1))
-        @assert (:traces ∈ propertynames(rr)) "trace recorder not found, did you include it in your run?"
+        @assert (:traces in propertynames(rr)) "trace recorder not found, did you include it in your run?"
         return new{T,PT}(pt, chain)
     end
 end
 
-Base.size(s::SampleArray) = (length(s.pt.reduced_recorders.traces),)
+function Base.size(s::SampleArray) 
+    chains = map((x) -> x[1], collect(keys(s.pt.reduced_recorders.traces)))
+    unique_chains = unique(chains)
+    sizes = Vector{Int}(undef, length(unique_chains))
+    for i in eachindex(unique_chains)
+        sizes[i] = sum(chains .== unique_chains[i])
+    end 
+    @assert allequal(sizes) # check that all chains have the same number of samples
+    return (sizes[1], )
+end
 Base.IndexStyle(::Type{<:SampleArray}) = IndexLinear()
 Base.getindex(s::SampleArray, i::Int) = get_sample(s.pt, s.chain, i)
 Base.setindex!(::SampleArray, v, i::Int) = error("You cannot set the elements of SampleArray")
@@ -27,9 +78,7 @@ Base.setindex!(::SampleArray, v, i::Int) = error("You cannot set the elements of
 """
 $(SIGNATURES)
 """
-get_sample(pt::PT, chain::Int) = SampleArray(pt, chain)
-
-
+get_sample(pt::PT, chain = target_chains(pt)[1]) = SampleArray(pt, chain)
 
 function Base.show(io::IO, s::SampleArray{T,PT}) where {T,PT}
     println(io, "SampleArray{$T}")
@@ -46,14 +95,14 @@ get_sample(pt::PT, chain::Int, scan::Int) = pt.reduced_recorders.traces[chain =>
 """
 $SIGNATURES
 """
-process_samples(processor::Function, pt::PT, round::Int = latest_checkpoint_folder(pt.exec_folder)) =
-    process_samples(processor, pt.exec_folder, round)
+process_sample(processor::Function, pt::PT, round::Int = latest_checkpoint_folder(pt.exec_folder)) =
+    process_sample(processor, pt.exec_folder, round)
 
 """
 $SIGNATURES
 """
-process_samples(processor::Function, pt::Result{PT}, round::Int = latest_checkpoint_folder(pt.exec_folder)) =
-    process_samples(processor, pt.exec_folder, round)
+process_sample(processor::Function, pt::Result{PT}, round::Int = latest_checkpoint_folder(pt.exec_folder)) =
+    process_sample(processor, pt.exec_folder, round)
 
 
 """
@@ -73,7 +122,7 @@ within the round, starting at 1, and sample is the deserialized sample.
 This iterates over the samples in increasing order, looping over `chain_index` in the
 outer loop and `scan_index` in the inner loop.
 """
-function process_samples(processor::Function, exec_folder::String, round::Int)
+function process_sample(processor::Function, exec_folder::String, round::Int)
     if round == 0
         error("no checkpoint is available yet for $exec_folder")
     elseif round < 0
